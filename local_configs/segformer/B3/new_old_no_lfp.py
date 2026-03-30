@@ -1,4 +1,4 @@
-﻿_base_ = [
+_base_ = [
     '../../_base_/models/segformer.py',
     '../../_base_/datasets/doctamper.py',
     '../../_base_/default_runtime.py',
