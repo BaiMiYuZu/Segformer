@@ -1,6 +1,6 @@
-_base_ = [
+﻿_base_ = [
     '../../_base_/models/segformer.py',
-    '../../_base_/datasets/doctamper.py', # 【关键修改】：换成你的数据集配置
+    '../../_base_/datasets/doctamper.py',
     '../../_base_/default_runtime.py',
     '../../_base_/schedules/schedule_160k_adamw.py'
 ]
@@ -16,7 +16,7 @@ model = dict(
     neck=dict(
         type='LFPNeck',
         in_channels=[64, 128, 320, 512],
-        active_stages=(2, 3),
+        active_stages=(0, 1, 2, 3),
         wave='haar',
         mode='zero',
         with_gauss=True,
@@ -28,30 +28,31 @@ model = dict(
         feature_strides=[4, 8, 16, 32],
         channels=128,
         dropout_ratio=0.1,
-        num_classes=2, # 【关键修改】：DocTamper 为二分类任务，设为2
+        num_classes=2,
         norm_cfg=norm_cfg,
         align_corners=False,
         decoder_params=dict(embed_dim=768),
-        # 【修改点 2】：组合损失 (带权重的 CrossEntropy + DiceLoss) 解决严重类别不平衡
+        sampler=dict(
+            type='OHEMPixelSampler',
+            thresh=0.7,
+            min_kept=10000),
         loss_decode=[
             dict(
                 type='CrossEntropyLoss',
                 use_sigmoid=False,
-                class_weight=[1.0, 8.0],
+                class_weight=[1.0, 24.0],
                 loss_name='loss_ce',
-                loss_weight=1.0),
+                loss_weight=1.5),
             dict(
                 type='CustomDiceLoss',
                 use_sigmoid=False,
                 loss_name='loss_dice',
-                loss_weight=1.0)
+                loss_weight=1.5)
         ]
     ),
-    # model training and testing settings
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
 
-# optimizer
 optimizer = dict(_delete_=True, type='AdamW', lr=0.00006, betas=(0.9, 0.999), weight_decay=0.01,
                  paramwise_cfg=dict(custom_keys={'pos_block': dict(decay_mult=0.),
                                                  'norm': dict(decay_mult=0.),
@@ -64,6 +65,5 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-# 【修改点 3（可选）】：如果你的显卡显存足够（比如 24G 或更高），强烈建议将 batch size (samples_per_gpu) 调到 4 或 8
 data = dict(samples_per_gpu=6)
 evaluation = dict(interval=8000, metric=['mIoU'])

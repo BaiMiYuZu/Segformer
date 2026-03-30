@@ -26,6 +26,57 @@ We use [MMSegmentation v0.13.0](https://github.com/open-mmlab/mmsegmentation/tre
 🔥🔥 SegFormer is on [MMSegmentation](https://github.com/open-mmlab/mmsegmentation/tree/master/configs/segformer). 🔥🔥 
 
 
+
+## Project Notes
+
+This fork is used for document tamper localization based on SegFormer-B3 and
+includes an optional `LFP` neck inserted between the encoder and the
+`SegFormerHead` decoder.
+
+### LFP integration
+
+- File: `mmseg/models/necks/lfp_neck.py`
+- Position: backbone 4-stage outputs -> `LFPNeck` -> `SegFormerHead`
+- Behavior: each encoder stage can be purified independently before decoding
+
+`LFP.py` depends on wavelet packages. Before training or testing an LFP-based
+model, make sure the active environment includes:
+
+```bash
+pip install PyWavelets pytorch_wavelets
+```
+
+### Frozen config snapshots
+
+Three config snapshots are kept so older checkpoints can still be tested with
+their matching model structure:
+
+- `local_configs/segformer/B3/new_old_no_lfp.py`
+  - Old SegFormer baseline without LFP
+- `local_configs/segformer/B3/new_old_lfp_all.py`
+  - Earlier LFP version with all four encoder stages enabled
+- `local_configs/segformer/B3/new_balanced_lfp_deep.py`
+  - Current balanced version with LFP only on stages 3 and 4
+
+`local_configs/segformer/B3/new.py` is the current working config and may keep
+changing during experiments. For reproducible testing, prefer the frozen
+snapshots above.
+
+### Testing checkpoints
+
+Pick the config that matches the checkpoint architecture:
+
+```bash
+python tools/test.py local_configs/segformer/B3/new_old_no_lfp.py   work_dirs/new/<checkpoint>.pth --eval mIoU mDice
+
+python tools/test.py local_configs/segformer/B3/new_old_lfp_all.py   work_dirs/new/<checkpoint>.pth --eval mIoU mDice
+
+python tools/test.py local_configs/segformer/B3/new_balanced_lfp_deep.py   work_dirs/new/<checkpoint>.pth --eval mIoU mDice
+```
+
+The customized evaluation code also prints `Precision`, `Recall`, and
+`F1-Score` for both classes, where class `1` is the tampered region.
+
 ## Installation
 
 For install and data preparation, please refer to the guidelines in [MMSegmentation v0.13.0](https://github.com/open-mmlab/mmsegmentation/tree/v0.13.0).
