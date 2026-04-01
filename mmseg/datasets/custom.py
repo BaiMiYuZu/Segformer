@@ -9,6 +9,7 @@ from terminaltables import AsciiTable
 from torch.utils.data import Dataset
 
 from mmseg.core import eval_metrics
+from mmseg.core.evaluation.metrics import precision_recall_f1
 from mmseg.utils import get_root_logger
 from .builder import DATASETS
 from .pipelines import Compose
@@ -334,15 +335,21 @@ class CustomDataset(Dataset):
                 reduce(np.union1d, [np.unique(_) for _ in gt_seg_maps]))
         else:
             num_classes = len(self.CLASSES)
-        ret_metrics = eval_metrics(
+        ret_metrics, metric_details = eval_metrics(
             results,
             gt_seg_maps,
             num_classes,
             self.ignore_index,
             metric,
             label_map=self.label_map,
-            reduce_zero_label=self.reduce_zero_label)
-        class_table_data = [['Class'] + [m[1:] for m in metric] + ['Acc']]
+            reduce_zero_label=self.reduce_zero_label,
+            return_details=True)
+        precision, recall, f1 = precision_recall_f1(
+            metric_details['total_area_intersect'],
+            metric_details['total_area_pred_label'],
+            metric_details['total_area_label'])
+        class_table_data = [['Class'] + [m[1:] for m in metric] +
+                            ['Acc', 'Precision', 'Recall', 'F1']]
         if self.CLASSES is None:
             class_names = tuple(range(num_classes))
         else:
@@ -350,10 +357,16 @@ class CustomDataset(Dataset):
         ret_metrics_round = [
             np.round(ret_metric * 100, 2) for ret_metric in ret_metrics
         ]
+        precision_round = np.round(precision * 100, 2)
+        recall_round = np.round(recall * 100, 2)
+        f1_round = np.round(f1 * 100, 2)
         for i in range(num_classes):
             class_table_data.append([class_names[i]] +
                                     [m[i] for m in ret_metrics_round[2:]] +
-                                    [ret_metrics_round[1][i]])
+                                    [ret_metrics_round[1][i],
+                                     precision_round[i],
+                                     recall_round[i],
+                                     f1_round[i]])
         summary_table_data = [['Scope'] +
                               ['m' + head
                                for head in class_table_data[0][1:]] + ['aAcc']]
@@ -361,9 +374,21 @@ class CustomDataset(Dataset):
             np.round(np.nanmean(ret_metric) * 100, 2)
             for ret_metric in ret_metrics
         ]
+        precision_mean = np.round(np.nanmean(precision) * 100, 2)
+        recall_mean = np.round(np.nanmean(recall) * 100, 2)
+        f1_mean = np.round(np.nanmean(f1) * 100, 2)
         summary_table_data.append(['global'] + ret_metrics_mean[2:] +
-                                  [ret_metrics_mean[1]] +
+                                  [ret_metrics_mean[1],
+                                   precision_mean,
+                                   recall_mean,
+                                   f1_mean] +
                                   [ret_metrics_mean[0]])
+        print_log(
+            'Custom metric summary: '
+            f'Precision={precision_round.tolist()} '
+            f'Recall={recall_round.tolist()} '
+            f'F1={f1_round.tolist()}',
+            logger)
         print_log('per class results:', logger)
         table = AsciiTable(class_table_data)
         print_log('\n' + table.table, logger=logger)

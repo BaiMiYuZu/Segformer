@@ -2,6 +2,26 @@ import mmcv
 import numpy as np
 
 
+def precision_recall_f1(total_area_intersect,
+                        total_area_pred_label,
+                        total_area_label,
+                        nan_to_num=None):
+    """Calculate per-class precision, recall and F1-score."""
+
+    eps = np.finfo(np.float64).eps
+    precision = total_area_intersect / np.maximum(total_area_pred_label, eps)
+    recall = total_area_intersect / np.maximum(total_area_label, eps)
+    f1 = 2 * total_area_intersect / np.maximum(
+        total_area_pred_label + total_area_label, eps)
+
+    if nan_to_num is not None:
+        precision = np.nan_to_num(precision, nan=nan_to_num)
+        recall = np.nan_to_num(recall, nan=nan_to_num)
+        f1 = np.nan_to_num(f1, nan=nan_to_num)
+
+    return precision, recall, f1
+
+
 def intersect_and_union(pred_label,
                         label,
                         num_classes,
@@ -183,7 +203,8 @@ def eval_metrics(results,
                  metrics=['mIoU'],
                  nan_to_num=None,
                  label_map=dict(),
-                 reduce_zero_label=False):
+                 reduce_zero_label=False,
+                 return_details=False):
     """Calculate evaluation metrics
     Args:
         results (list[ndarray]): List of prediction segmentation maps.
@@ -216,23 +237,9 @@ def eval_metrics(results,
     ret_metrics = [all_acc, acc]
     for metric in metrics:
         if metric == 'mIoU':
-            # iou = total_area_intersect / total_area_union
-            # ret_metrics.append(iou)
-            # 引入极小值防止除零报错（非常重要）
             eps = np.finfo(np.float64).eps
-            # 计算原始的 IoU，并按框架要求追加到列表中
             iou = total_area_intersect / np.maximum(total_area_union, eps)
             ret_metrics.append(iou)
-            # --- 以下是我们自己计算并打印的 P, R, F1 逻辑 ---
-            recall = total_area_intersect / np.maximum(total_area_label, eps)
-            precision = total_area_intersect / np.maximum(total_area_pred_label, eps)
-            f1 = 2 * total_area_intersect / np.maximum(total_area_pred_label + total_area_label, eps)
-            print("\n" + "="*50)
-            print(" 【自定义指标检测结果】 (Class 0: 背景, Class 1: 篡改)")
-            print(f"  Precision (精确率) : {np.round(precision * 100, 2)}")
-            print(f"  Recall    (召回率) : {np.round(recall * 100, 2)}")
-            print(f"  F1-Score           : {np.round(f1 * 100, 2)}")
-            print("="*50 + "\n")
         elif metric == 'mDice':
             dice = 2 * total_area_intersect / (
                 total_area_pred_label + total_area_label)
@@ -241,4 +248,12 @@ def eval_metrics(results,
         ret_metrics = [
             np.nan_to_num(metric, nan=nan_to_num) for metric in ret_metrics
         ]
-    return ret_metrics
+    if not return_details:
+        return ret_metrics
+
+    metric_details = dict(
+        total_area_intersect=total_area_intersect,
+        total_area_union=total_area_union,
+        total_area_pred_label=total_area_pred_label,
+        total_area_label=total_area_label)
+    return ret_metrics, metric_details

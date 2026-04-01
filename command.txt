@@ -1,5 +1,12 @@
 python tools/train.py local_configs/segformer/B3/segformer.b3.512x512.doctamper.160k.py
-python tools/train.py local_configs/segformer/B3/new.py
+python tools/train.py local_configs/segformer/B3/new_balanced_lfp_deep.py
 python tools/train.py local_configs/segformer/B3/new.py --resume work_dirs/new/latest.pth
 python tools/test.py local_configs/segformer/B3/new.py work_dirs/new/latest.pth --eval mIoU
-python tools/test.py local_configs/segformer/B3/new.py work_dirs/new/latest.pth --eval mIoU mDice
+
+
+
+set TEMP=D:\temp_mmseg
+set TMP=D:\temp_mmseg
+python tools/test.py local_configs/segformer/B3/new_balanced_lfp_deep.py work_dirs/new_balanced_lfp_deep/latest.pth --eval mIoU mDice --eval-options efficient_test=True
+
+
